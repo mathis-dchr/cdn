@@ -1,0 +1,3 @@
+# Ne pas inclure le dossier de runtime généré par containerlab
+clab*/
+.clab*/
