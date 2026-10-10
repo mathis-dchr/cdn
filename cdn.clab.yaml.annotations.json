@@ -1,0 +1,126 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "r1",
+      "position": {
+        "x": 0,
+        "y": -200
+      }
+    },
+    {
+      "id": "r2-ca",
+      "position": {
+        "x": -300,
+        "y": -100
+      }
+    },
+    {
+      "id": "r2-fr",
+      "position": {
+        "x": 0,
+        "y": -100
+      }
+    },
+    {
+      "id": "r2-jp",
+      "position": {
+        "x": 320,
+        "y": -100
+      }
+    },
+    {
+      "id": "cdn-fr",
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "origin",
+      "position": {
+        "x": 0,
+        "y": 100
+      },
+      "icon": "server"
+    },
+    {
+      "id": "isp-ca",
+      "position": {
+        "x": -440,
+        "y": 0
+      }
+    },
+    {
+      "id": "u1-ca",
+      "position": {
+        "x": -480,
+        "y": 100
+      },
+      "icon": "client"
+    },
+    {
+      "id": "u2-ca",
+      "position": {
+        "x": -400,
+        "y": 100
+      },
+      "icon": "client"
+    },
+    {
+      "id": "cdn-ca",
+      "position": {
+        "x": -180,
+        "y": 0
+      }
+    },
+    {
+      "id": "swt-lb-ca",
+      "position": {
+        "x": -140,
+        "y": 200
+      },
+      "icon": "switch"
+    },
+    {
+      "id": "swt-vpn-ca",
+      "position": {
+        "x": -220,
+        "y": 200
+      },
+      "icon": "switch",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "s1-ca",
+      "position": {
+        "x": -260,
+        "y": 300
+      },
+      "icon": "server"
+    },
+    {
+      "id": "s2-ca",
+      "position": {
+        "x": -180,
+        "y": 300
+      },
+      "icon": "server"
+    },
+    {
+      "id": "s3-ca",
+      "position": {
+        "x": -100,
+        "y": 300
+      },
+      "icon": "server"
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

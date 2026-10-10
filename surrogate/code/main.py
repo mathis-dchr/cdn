@@ -3,8 +3,9 @@ import json
 import os
 
 PORT = int(os.environ.get("PORT", 8080))
-VAR = os.environ.get("VAR", "0")
+TYPE = os.environ.get("TYPE", "surrogate")
 
+print(f"Démarrage du service en mode : {TYPE}")
 
 async def handle_client(
     reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -33,7 +34,6 @@ async def handle_client(
             payload = {
                 "message": "Serveur de test acti",
                 "client": {"ip": client_ip, "port": client_port},
-                "env_var": VAR,
                 "path": path,
                 "method": method,
             }

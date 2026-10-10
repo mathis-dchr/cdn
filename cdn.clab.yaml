@@ -1,0 +1,120 @@
+name: cdn
+
+topology:
+  nodes:
+    # TIER 1
+    r1:
+      # AS 10
+      &router
+      kind: linux
+      image: "quay.io/frrouting/frr:10.2.1"
+      binds:
+        - ./router/configs/__clabNodeName__:/etc/frr/ # montage automatique configs/<nom_du_noeud>/frr.conf
+        - ./router/daemons:/etc/frr/daemons:ro # écrase le fichier daemons avec le modèle commun partagé (en lecture seule)
+
+    # TIER 2
+    r2-ca: *router # AS 1020
+
+    r2-fr: *router # AS 2020
+
+    r2-jp: *router # AS 3020
+
+    # ORIGIN (FR)
+    cdn-fr: *router # AS 2040
+
+    origin:
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code/main.py:/code/main.py:ro
+        - ./surrogate/files/__clabNodeName__:/files
+      env:
+        TYPE: origin
+      exec:
+        - ip addr add 192.168.1.10/24 dev eth1
+        - ip route add default via 192.168.1.1
+
+    # CA-ISP
+    isp-ca: *router # AS 1030
+
+    u1-ca: &user
+      kind: linux
+      image: alpine:latest
+      ports:
+        - 1001:8888
+      exec:
+        - ip addr add 10.40.0.40/24 dev eth1
+        - ip route add default via 10.40.0.1
+        - apk add --no-cache tinyproxy
+        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
+          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
+        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+
+    u2-ca:
+      <<: *user
+      ports:
+        - 1002:8888
+      exec:
+        - ip addr add 192.168.1.102/24 dev eth1
+        - ip route add default via 192.168.1.1
+        - apk add --no-cache tinyproxy
+        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
+          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
+        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+
+    # CA-CDN
+    cdn-ca: *router # AS 1040
+
+    swt-lb-ca: &switch
+      kind: linux
+      image: alpine:latest
+      exec:
+        - ip link add name br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0 up
+        - ip link set eth2 master br0 up
+        - ip link set eth3 master br0 up
+        - ip link set eth4 master br0 up
+
+    swt-vpn-ca:
+      kind: linux
+      image: alpine:latest
+      exec:
+        - ip link add name br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0 up
+        - ip link set eth2 master br0 up
+        - ip link set eth3 master br0 up
+        - ip link set eth4 master br0 up
+
+    s1-ca: &surrogate
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code/main.py:/code/main.py:ro
+        - ./surrogate/files/__clabNodeName__:/files
+      env:
+        TYPE: surrogate
+      exec:
+        - ip addr add 10.40.0.10/24 dev eth1
+        #- ip addr add 10.50.0.10/24 dev eth2
+        - ip route add default via 10.50.0.1
+
+    s2-ca:
+      <<: *surrogate
+      exec:
+        - ip addr add 10.40.0.20/24 dev eth1
+        #- ip addr add 10.50.0.20/24 dev eth2
+        - ip route add default via 10.50.0.1
+
+    s3-ca:
+      <<: *surrogate
+      exec:
+        - ip addr add 10.40.0.30/24 dev eth1
+        #- ip addr add 10.50.0.30/24 dev eth2
+        - ip route add default via 10.50.0.1
+
+  links:
+    - endpoints: [ "s1-ca:eth1", "swt-lb-ca:eth1" ]
+    - endpoints: [ "s2-ca:eth1", "swt-lb-ca:eth2" ]
+    - endpoints: [ "u1-ca:eth1", "swt-lb-ca:eth3" ]
