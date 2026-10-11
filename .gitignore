@@ -1,3 +1,7 @@
-# Ne pas inclure le dossier de runtime généré par containerlab
+# Containerlab runtime
 clab*/
 .clab*/
+
+# Draw.io temporary backups
+*.drawio.bkp
+.*.drawio.bkp
