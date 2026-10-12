@@ -29,8 +29,8 @@
     {
       "id": "r2-jp",
       "position": {
-        "x": 320,
-        "y": -100
+        "x": 560,
+        "y": -200
       }
     },
     {
@@ -74,7 +74,7 @@
     {
       "id": "cdn-ca",
       "position": {
-        "x": -180,
+        "x": -280,
         "y": 0
       }
     },
@@ -118,6 +118,95 @@
         "y": 300
       },
       "icon": "server"
+    },
+    {
+      "id": "s3-jp",
+      "position": {
+        "x": 260,
+        "y": 320
+      },
+      "icon": "server"
+    },
+    {
+      "id": "s2-jp",
+      "position": {
+        "x": 360,
+        "y": 320
+      },
+      "icon": "server",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "s1-jp",
+      "position": {
+        "x": 460,
+        "y": 320
+      },
+      "icon": "server",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "swt-vpn-jp",
+      "position": {
+        "x": 500,
+        "y": 120
+      },
+      "icon": "switch",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "swt-lb-jp",
+      "position": {
+        "x": 280,
+        "y": 120
+      },
+      "icon": "switch",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "lb-jp",
+      "position": {
+        "x": 300,
+        "y": -80
+      }
+    },
+    {
+      "id": "cdn-jp",
+      "position": {
+        "x": 460,
+        "y": -80
+      }
+    },
+    {
+      "id": "u2-jp",
+      "position": {
+        "x": 720,
+        "y": 120
+      },
+      "icon": "client",
+      "iconCornerRadius": 0
+    },
+    {
+      "id": "u1-jp",
+      "position": {
+        "x": 920,
+        "y": 120
+      },
+      "icon": "client"
+    },
+    {
+      "id": "isp-jp",
+      "position": {
+        "x": 800,
+        "y": -80
+      }
+    },
+    {
+      "id": "lb-ca",
+      "position": {
+        "x": -140,
+        "y": 0
+      }
     }
   ],
   "edgeAnnotations": [],
