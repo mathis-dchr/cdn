@@ -2,24 +2,20 @@ name: cdn
 
 topology:
   nodes:
-    # TIER 1
-    r1:
-      # AS 10
-      &router
+    # ------------------------------------------------------------------ TIER 1
+    r1: &router # AS 10
       kind: linux
       image: "quay.io/frrouting/frr:10.2.1"
       binds:
-        - ./router/configs/__clabNodeName__:/etc/frr/ # montage automatique configs/<nom_du_noeud>/frr.conf
-        - ./router/daemons:/etc/frr/daemons:ro # écrase le fichier daemons avec le modèle commun partagé (en lecture seule)
+        - ./router/configs/__clabNodeName__:/etc/frr/   # configs/<nom_du_noeud>/frr.conf
+        - ./router/daemons:/etc/frr/daemons:ro          # fichier daemons commun (lecture seule)
 
-    # TIER 2
+    # ------------------------------------------------------------------ TIER 2
     r2-ca: *router # AS 1020
-
     r2-fr: *router # AS 2020
-
     r2-jp: *router # AS 3020
 
-    # ORIGIN (FR)
+    # ------------------------------------------------------------------ ORIGIN (FR)
     cdn-fr: *router # AS 2040
 
     origin:
@@ -31,10 +27,10 @@ topology:
       env:
         TYPE: origin
       exec:
-        - ip addr add 192.168.1.10/24 dev eth1
-        - ip route add default via 192.168.1.1
+        - ip addr add 20.40.1.2/24 dev eth1
+        - ip route replace default via 20.40.1.1
 
-    # CA-ISP
+    # ------------------------------------------------------------------ CA-ISP
     isp-ca: *router # AS 1030
 
     u1-ca: &user
@@ -43,33 +39,35 @@ topology:
       ports:
         - 1001:8888
       exec:
-        - ip addr add 10.40.0.40/24 dev eth1
-        - ip route add default via 10.40.0.1
-        - apk add --no-cache tinyproxy
-        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
-          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
-        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+        - ip addr add 10.30.1.2/24 dev eth1
+        - ip route replace default via 10.30.1.1
+        # Proxy HTTP sur le port 8888, réutilisé par tous les users via l'ancre *tinyproxy
+        - &tinyproxy >-
+          sh -c 'apk add --no-cache tinyproxy &&
+          printf "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout 600\nLogLevel Info\n"
+          > /etc/tinyproxy/tinyproxy.conf &&
+          tinyproxy -c /etc/tinyproxy/tinyproxy.conf'
 
     u2-ca:
       <<: *user
       ports:
         - 1002:8888
       exec:
-        - ip addr add 192.168.1.102/24 dev eth1
-        - ip route add default via 192.168.1.1
-        - apk add --no-cache tinyproxy
-        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
-          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
-        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+        - ip addr add 10.30.2.2/24 dev eth1
+        - ip route replace default via 10.30.2.1
+        - *tinyproxy
 
-    # CA-CDN
+    # ------------------------------------------------------------------ CA-CDN
     cdn-ca: *router # AS 1040
 
-    lb-ca:
-      # TODO : image et configuration du load balancer à définir
-      &lb
+    lb-ca: &lb
+      # TODO : image et logiciel du load balancer à définir (HAProxy, nginx, ...)
       kind: linux
       image: alpine:latest
+      exec:
+        - ip addr add 10.0.0.1/24 dev eth1      # adresse anycast côté cdn-ca
+        - ip addr add 10.40.2.1/24 dev eth2     # réseau load balancer CA
+        - ip route replace default via 10.0.0.10
 
     swt-lb-ca: &switch
       kind: linux
@@ -82,17 +80,10 @@ topology:
         - ip link set eth3 master br0 up
         - ip link set eth4 master br0 up
 
-    swt-vpn-ca:
-      kind: linux
-      image: alpine:latest
-      exec:
-        - ip link add name br0 type bridge
-        - ip link set br0 up
-        - ip link set eth1 master br0 up
-        - ip link set eth2 master br0 up
-        - ip link set eth3 master br0 up
-        - ip link set eth4 master br0 up
+    swt-vpn-ca: *switch
 
+    # Surrogates : eth1 = réseau LB (swt-lb), eth2 = réseau VPN (swt-vpn)
+    # Route par défaut via le routeur CDN (réseau VPN) pour joindre l'origin.
     s1-ca: &surrogate
       kind: linux
       image: ghcr.io/mathis-dchr/cdn:latest
@@ -102,25 +93,25 @@ topology:
       env:
         TYPE: surrogate
       exec:
-        - ip addr add 10.40.0.10/24 dev eth1
-        #- ip addr add 10.50.0.10/24 dev eth2
-        - ip route add default via 10.50.0.1
+        - ip addr add 10.40.2.2/24 dev eth1
+        - ip addr add 10.40.1.2/24 dev eth2
+        - ip route replace default via 10.40.1.1
 
     s2-ca:
       <<: *surrogate
       exec:
-        - ip addr add 10.40.0.20/24 dev eth1
-        #- ip addr add 10.50.0.20/24 dev eth2
-        - ip route add default via 10.50.0.1
+        - ip addr add 10.40.2.3/24 dev eth1
+        - ip addr add 10.40.1.3/24 dev eth2
+        - ip route replace default via 10.40.1.1
 
     s3-ca:
       <<: *surrogate
       exec:
-        - ip addr add 10.40.0.30/24 dev eth1
-        #- ip addr add 10.50.0.30/24 dev eth2
-        - ip route add default via 10.50.0.1
+        - ip addr add 10.40.2.4/24 dev eth1
+        - ip addr add 10.40.1.4/24 dev eth2
+        - ip route replace default via 10.40.1.1
 
-    # JP-ISP
+    # ------------------------------------------------------------------ JP-ISP
     isp-jp: *router # AS 3030
 
     u1-jp:
@@ -128,115 +119,116 @@ topology:
       ports:
         - 1003:8888
       exec:
-        - apk add --no-cache tinyproxy
-        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
-          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
-        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+        - ip addr add 30.30.1.2/24 dev eth1
+        - ip route replace default via 30.30.1.1
+        - *tinyproxy
 
     u2-jp:
       <<: *user
       ports:
         - 1004:8888
       exec:
-        - apk add --no-cache tinyproxy
-        - sh -c 'echo -e "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout
-          600\nLogLevel Info" > /etc/tinyproxy/tinyproxy.conf'
-        - tinyproxy -c /etc/tinyproxy/tinyproxy.conf
+        - ip addr add 30.30.2.2/24 dev eth1
+        - ip route replace default via 30.30.2.1
+        - *tinyproxy
 
-    # JP-CDN
+    # ------------------------------------------------------------------ JP-CDN
     cdn-jp: *router # AS 3040
 
-    lb-jp: *lb # TODO : image et configuration du load balancer à définir
-
-    swt-lb-jp:
-      kind: linux
-      image: alpine:latest
+    lb-jp:
+      <<: *lb
       exec:
-        - ip link add name br0 type bridge
-        - ip link set br0 up
-        - ip link set eth1 master br0 up
-        - ip link set eth2 master br0 up
-        - ip link set eth3 master br0 up
-        - ip link set eth4 master br0 up
+        - ip addr add 10.0.0.1/24 dev eth1      # adresse anycast côté cdn-jp
+        - ip addr add 30.40.2.1/24 dev eth2     # réseau load balancer JP
+        - ip route replace default via 10.0.0.30
 
-    swt-vpn-jp:
-      kind: linux
-      image: alpine:latest
-      exec:
-        - ip link add name br0 type bridge
-        - ip link set br0 up
-        - ip link set eth1 master br0 up
-        - ip link set eth2 master br0 up
-        - ip link set eth3 master br0 up
-        - ip link set eth4 master br0 up
+    swt-lb-jp: *switch
+    swt-vpn-jp: *switch
 
     s1-jp:
       <<: *surrogate
+      exec:
+        - ip addr add 30.40.2.2/24 dev eth1
+        - ip addr add 30.40.1.2/24 dev eth2
+        - ip route replace default via 30.40.1.1
 
     s2-jp:
       <<: *surrogate
+      exec:
+        - ip addr add 30.40.2.3/24 dev eth1
+        - ip addr add 30.40.1.3/24 dev eth2
+        - ip route replace default via 30.40.1.1
 
     s3-jp:
       <<: *surrogate
+      exec:
+        - ip addr add 30.40.2.4/24 dev eth1
+        - ip addr add 30.40.1.4/24 dev eth2
+        - ip route replace default via 30.40.1.1
 
   # ===========================================================================
-  # LIENS — conformes au schéma cdn.svg (IP du schéma en commentaire, côté A / côté B)
-  # Convention : eth1 = lien montant ; sur les switches, eth1 = uplink (LB ou routeur CDN)
+  # LIENS — IP en commentaire : côté A / côté B
+  # Convention : eth1 = lien montant ; sur les switches, eth1 = uplink
   # Surrogates : eth1 = réseau load balancer (swt-lb), eth2 = réseau VPN (swt-vpn)
   # ===========================================================================
   links:
     # ------------------------------------------------------------ TIER1 <-> TIER2
-    - endpoints: [ "r1:eth1", "r2-ca:eth1" ] # 10.10.1.1 / 10.10.1.2
-    - endpoints: [ "r1:eth2", "r2-fr:eth1" ] # 20.10.1.1 / 20.10.1.2
-    - endpoints: [ "r1:eth3", "r2-jp:eth1" ] # 30.10.1.1 / 30.10.1.2
+    - endpoints: ["r1:eth1", "r2-ca:eth1"]          # 10.10.1.1 / 10.10.1.2
+    - endpoints: ["r1:eth2", "r2-fr:eth1"]          # 20.10.1.1 / 20.10.1.2
+    - endpoints: ["r1:eth3", "r2-jp:eth1"]          # 30.10.1.1 / 30.10.1.2
+
+    # ------------------------------------------------------------ TIER2 <-> TIER2 (full mesh)
+    - endpoints: ["r2-ca:eth4", "r2-fr:eth3"]       # 10.20.3.1 / 10.20.3.2
+    - endpoints: ["r2-fr:eth4", "r2-jp:eth4"]       # 20.20.3.1 / 20.20.3.2
 
     # ------------------------------------------------------------ TIER2 CA
-    - endpoints: [ "r2-ca:eth2", "isp-ca:eth1" ] # 10.20.1.1 / 10.20.1.2
-    - endpoints: [ "r2-ca:eth3", "cdn-ca:eth1" ] # 10.20.2.1 / 10.20.2.2
+    - endpoints: ["r2-ca:eth2", "isp-ca:eth1"]      # 10.20.1.1 / 10.20.1.2
+    - endpoints: ["r2-ca:eth3", "cdn-ca:eth1"]      # 10.20.2.1 / 10.20.2.2
 
     # ------------------------------------------------------------ TIER2 FR + ORIGIN
-    - endpoints: [ "r2-fr:eth2", "cdn-fr:eth1" ] # 20.20.1.1 / 20.20.1.2
-    - endpoints: [ "cdn-fr:eth2", "origin:eth1" ] # 20.40.1.1 / 20.40.1.2
+    - endpoints: ["r2-fr:eth2", "cdn-fr:eth1"]      # 20.20.1.1 / 20.20.1.2
+    - endpoints: ["cdn-fr:eth2", "origin:eth1"]     # 20.40.1.1 / 20.40.1.2
 
     # ------------------------------------------------------------ TIER2 JP
-    - endpoints: [ "r2-jp:eth2", "cdn-jp:eth1" ] # 30.20.2.1 / 30.20.2.2
-    - endpoints: [ "r2-jp:eth3", "isp-jp:eth1" ] # 30.20.1.1 / 30.20.1.2
+    - endpoints: ["r2-jp:eth2", "cdn-jp:eth1"]      # 30.20.2.1 / 30.20.2.2
+    - endpoints: ["r2-jp:eth3", "isp-jp:eth1"]      # 30.20.1.1 / 30.20.1.2
 
     # ------------------------------------------------------------ ISP CA
-    - endpoints: [ "isp-ca:eth2", "u1-ca:eth1" ] # 10.30.1.1 / 10.30.1.2
-    - endpoints: [ "isp-ca:eth3", "u2-ca:eth1" ] # 10.30.2.1 / 10.30.2.2
+    - endpoints: ["isp-ca:eth2", "u1-ca:eth1"]      # 10.30.1.1 / 10.30.1.2
+    - endpoints: ["isp-ca:eth3", "u2-ca:eth1"]      # 10.30.2.1 / 10.30.2.2
 
     # ------------------------------------------------------------ CDN CA
-    - endpoints: [ "cdn-ca:eth2", "lb-ca:eth1" ] # 10.0.0.10 / 10.0.0.1
-    - endpoints: [ "cdn-ca:eth3", "swt-vpn-ca:eth1" ] # 10.40.1.1
+    - endpoints: ["cdn-ca:eth2", "lb-ca:eth1"]      # 10.0.0.10 / 10.0.0.1
+    - endpoints: ["cdn-ca:eth3", "swt-vpn-ca:eth1"] # 10.40.1.1
+    - endpoints: ["cdn-ca:eth4", "isp-ca:eth2"] # peering 10.30.3.2 / 10.30.3.1
 
     # réseau load balancer 10.40.2.0/24
-    - endpoints: [ "lb-ca:eth2", "swt-lb-ca:eth1" ] # 10.40.2.1
-    - endpoints: [ "s1-ca:eth1", "swt-lb-ca:eth2" ] # 10.40.2.2
-    - endpoints: [ "s2-ca:eth1", "swt-lb-ca:eth3" ] # 10.40.2.3
-    - endpoints: [ "s3-ca:eth1", "swt-lb-ca:eth4" ] # 10.40.2.4
+    - endpoints: ["lb-ca:eth2", "swt-lb-ca:eth1"]   # 10.40.2.1
+    - endpoints: ["s1-ca:eth1", "swt-lb-ca:eth2"]   # 10.40.2.2
+    - endpoints: ["s2-ca:eth1", "swt-lb-ca:eth3"]   # 10.40.2.3
+    - endpoints: ["s3-ca:eth1", "swt-lb-ca:eth4"]   # 10.40.2.4
 
     # réseau VPN 10.40.1.0/24
-    - endpoints: [ "s1-ca:eth2", "swt-vpn-ca:eth2" ] # 10.40.1.2
-    - endpoints: [ "s2-ca:eth2", "swt-vpn-ca:eth3" ] # 10.40.1.3
-    - endpoints: [ "s3-ca:eth2", "swt-vpn-ca:eth4" ] # 10.40.1.4
+    - endpoints: ["s1-ca:eth2", "swt-vpn-ca:eth2"]  # 10.40.1.2
+    - endpoints: ["s2-ca:eth2", "swt-vpn-ca:eth3"]  # 10.40.1.3
+    - endpoints: ["s3-ca:eth2", "swt-vpn-ca:eth4"]  # 10.40.1.4
 
     # ------------------------------------------------------------ CDN JP
-    - endpoints: [ "cdn-jp:eth2", "lb-jp:eth1" ] # 10.0.0.30 / 10.0.0.1
-    - endpoints: [ "cdn-jp:eth3", "swt-vpn-jp:eth1" ] # 30.40.1.1
-    - endpoints: [ "cdn-jp:eth4", "isp-jp:eth2" ] # peering 30.30.3.2 / 30.30.3.1
+    - endpoints: ["cdn-jp:eth2", "lb-jp:eth1"]      # 10.0.0.30 / 10.0.0.1
+    - endpoints: ["cdn-jp:eth3", "swt-vpn-jp:eth1"] # 30.40.1.1
+    - endpoints: ["cdn-jp:eth4", "isp-jp:eth2"]     # peering 30.30.3.2 / 30.30.3.1
 
     # réseau load balancer 30.40.2.0/24
-    - endpoints: [ "lb-jp:eth2", "swt-lb-jp:eth1" ] # 30.40.2.1
-    - endpoints: [ "s1-jp:eth1", "swt-lb-jp:eth2" ] # 30.40.2.2
-    - endpoints: [ "s2-jp:eth1", "swt-lb-jp:eth3" ] # 30.40.2.3
-    - endpoints: [ "s3-jp:eth1", "swt-lb-jp:eth4" ] # 30.40.2.4
+    - endpoints: ["lb-jp:eth2", "swt-lb-jp:eth1"]   # 30.40.2.1
+    - endpoints: ["s1-jp:eth1", "swt-lb-jp:eth2"]   # 30.40.2.2
+    - endpoints: ["s2-jp:eth1", "swt-lb-jp:eth3"]   # 30.40.2.3
+    - endpoints: ["s3-jp:eth1", "swt-lb-jp:eth4"]   # 30.40.2.4
 
     # réseau VPN 30.40.1.0/24
-    - endpoints: [ "s1-jp:eth2", "swt-vpn-jp:eth2" ] # 30.40.1.2
-    - endpoints: [ "s2-jp:eth2", "swt-vpn-jp:eth3" ] # 30.40.1.3
-    - endpoints: [ "s3-jp:eth2", "swt-vpn-jp:eth4" ] # 30.40.1.4
+    - endpoints: ["s1-jp:eth2", "swt-vpn-jp:eth2"]  # 30.40.1.2
+    - endpoints: ["s2-jp:eth2", "swt-vpn-jp:eth3"]  # 30.40.1.3
+    - endpoints: ["s3-jp:eth2", "swt-vpn-jp:eth4"]  # 30.40.1.4
 
     # ------------------------------------------------------------ ISP JP
-    - endpoints: [ "isp-jp:eth3", "u1-jp:eth1" ] # 30.30.1.1 / 30.30.1.2
-    - endpoints: [ "isp-jp:eth4", "u2-jp:eth1" ] # 30.30.2.1 / 30.30.2.2
+    - endpoints: ["isp-jp:eth3", "u1-jp:eth1"]      # 30.30.1.1 / 30.30.1.2
+    - endpoints: ["isp-jp:eth4", "u2-jp:eth1"]      # 30.30.2.1 / 30.30.2.2

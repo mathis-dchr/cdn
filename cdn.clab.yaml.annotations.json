@@ -9,28 +9,28 @@
       "id": "r1",
       "position": {
         "x": 0,
-        "y": -200
+        "y": -320
       }
     },
     {
       "id": "r2-ca",
       "position": {
-        "x": -300,
-        "y": -100
+        "x": -360,
+        "y": -120
       }
     },
     {
       "id": "r2-fr",
       "position": {
         "x": 0,
-        "y": -100
+        "y": -140
       }
     },
     {
       "id": "r2-jp",
       "position": {
-        "x": 560,
-        "y": -200
+        "x": 360,
+        "y": -140
       }
     },
     {
@@ -51,14 +51,14 @@
     {
       "id": "isp-ca",
       "position": {
-        "x": -440,
+        "x": -620,
         "y": 0
       }
     },
     {
       "id": "u1-ca",
       "position": {
-        "x": -480,
+        "x": -660,
         "y": 100
       },
       "icon": "client"
@@ -66,7 +66,7 @@
     {
       "id": "u2-ca",
       "position": {
-        "x": -400,
+        "x": -580,
         "y": 100
       },
       "icon": "client"
@@ -74,23 +74,23 @@
     {
       "id": "cdn-ca",
       "position": {
-        "x": -280,
+        "x": -420,
         "y": 0
       }
     },
     {
       "id": "swt-lb-ca",
       "position": {
-        "x": -140,
-        "y": 200
+        "x": -260,
+        "y": 160
       },
       "icon": "switch"
     },
     {
       "id": "swt-vpn-ca",
       "position": {
-        "x": -220,
-        "y": 200
+        "x": -420,
+        "y": 160
       },
       "icon": "switch",
       "iconCornerRadius": 0
@@ -98,7 +98,7 @@
     {
       "id": "s1-ca",
       "position": {
-        "x": -260,
+        "x": -520,
         "y": 300
       },
       "icon": "server"
@@ -106,7 +106,7 @@
     {
       "id": "s2-ca",
       "position": {
-        "x": -180,
+        "x": -340,
         "y": 300
       },
       "icon": "server"
@@ -114,7 +114,7 @@
     {
       "id": "s3-ca",
       "position": {
-        "x": -100,
+        "x": -200,
         "y": 300
       },
       "icon": "server"
@@ -122,7 +122,7 @@
     {
       "id": "s3-jp",
       "position": {
-        "x": 260,
+        "x": 280,
         "y": 320
       },
       "icon": "server"
@@ -130,7 +130,7 @@
     {
       "id": "s2-jp",
       "position": {
-        "x": 360,
+        "x": 400,
         "y": 320
       },
       "icon": "server",
@@ -139,7 +139,7 @@
     {
       "id": "s1-jp",
       "position": {
-        "x": 460,
+        "x": 500,
         "y": 320
       },
       "icon": "server",
@@ -148,8 +148,8 @@
     {
       "id": "swt-vpn-jp",
       "position": {
-        "x": 500,
-        "y": 120
+        "x": 480,
+        "y": 160
       },
       "icon": "switch",
       "iconCornerRadius": 0
@@ -158,7 +158,7 @@
       "id": "swt-lb-jp",
       "position": {
         "x": 280,
-        "y": 120
+        "y": 160
       },
       "icon": "switch",
       "iconCornerRadius": 0
@@ -166,15 +166,15 @@
     {
       "id": "lb-jp",
       "position": {
-        "x": 300,
-        "y": -80
+        "x": 360,
+        "y": 0
       }
     },
     {
       "id": "cdn-jp",
       "position": {
         "x": 460,
-        "y": -80
+        "y": 0
       }
     },
     {
@@ -198,13 +198,13 @@
       "id": "isp-jp",
       "position": {
         "x": 800,
-        "y": -80
+        "y": 0
       }
     },
     {
       "id": "lb-ca",
       "position": {
-        "x": -140,
+        "x": -320,
         "y": 0
       }
     }
