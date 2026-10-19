@@ -3,7 +3,7 @@ name: cdn
 topology:
   nodes:
     # ------------------------------------------------------------------ TIER 1
-    r1: &router # AS 10
+    r1: &router # AS 1010
       kind: linux
       image: "quay.io/frrouting/frr:10.2.1"
       binds:
