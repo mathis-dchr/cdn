@@ -200,7 +200,7 @@ topology:
     # ------------------------------------------------------------ CDN CA
     - endpoints: ["cdn-ca:eth2", "lb-ca:eth1"]      # 10.0.0.10 / 10.0.0.1
     - endpoints: ["cdn-ca:eth3", "swt-vpn-ca:eth1"] # 10.40.1.1
-    - endpoints: ["cdn-ca:eth4", "isp-ca:eth2"] # peering 10.30.3.2 / 10.30.3.1
+    - endpoints: ["cdn-ca:eth4", "isp-ca:eth4"] # peering 10.30.3.2 / 10.30.3.1
 
     # réseau load balancer 10.40.2.0/24
     - endpoints: ["lb-ca:eth2", "swt-lb-ca:eth1"]   # 10.40.2.1
