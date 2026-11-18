@@ -1,0 +1,30 @@
+name: cdn-test
+
+topology:
+  nodes:
+    u1-jp:
+      kind: linux
+      image: alpine:latest
+      ports:
+        - 1003:8888
+      exec:
+        - ip addr add 30.40.2.1/24 dev eth1
+        - >-
+          sh -c 'apk add --no-cache tinyproxy &&
+          printf "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout 600\nLogLevel Info\n"
+          > /etc/tinyproxy/tinyproxy.conf &&
+          tinyproxy -c /etc/tinyproxy/tinyproxy.conf'
+
+    s1:
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code:/code:ro
+        - ./surrogate/cache/__clabNodeName__:/cache
+      env:
+        TYPE: surrogate
+      exec:
+        - ip addr add 30.40.2.2/24 dev eth1
+
+  links:
+    - endpoints: ["u1-jp:eth1", "s1:eth1"]   # 30.40.2.1 / 30.40.2.2
