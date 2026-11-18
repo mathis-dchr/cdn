@@ -1,75 +1,81 @@
-import asyncio
-import json
-import os
+'''
+Lancer le script avec python mickey.py
+-> Sur autre terminal, tester avec curl http://localhost/hello ou http://localhost/nom_du_fichier.html --> 200 ok
+-> Tester avec curl http://localhost/nom_du_fichier_inexistant.html ou http://localhost/autretexte --> 404 not found
 
-PORT = int(os.environ.get("PORT", 8080))
-TYPE = os.environ.get("TYPE", "surrogate")
+Curl avec Hello renvoie le nom de la machine et l'ip du serveur et du client
+Curl avec un fichier existant renvoie le contenu du fichier
 
-print(f"Démarrage du service en mode : {TYPE}")
+'''
+import os, socket
+import mimetypes
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from cache import Cache
 
-async def handle_client(
-    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-):
-    try:
-        raw_request = await reader.read(4096)
-        if not raw_request:
-            return
+cache = Cache()
 
-        request_text = raw_request.decode("utf-8", errors="replace")
-        lines = request_text.splitlines()
-        first_line = lines[0] if lines else "GET / HTTP/1.1"
-        method, path, *_ = first_line.split(" ")
+DOSSIER = os.path.dirname(os.path.abspath(__file__))
 
-        client_ip, client_port = writer.get_extra_info("peername")[:2]
-        print(f"[{method}] {path} depuis {client_ip}:{client_port}")
-
-        # Route de santé
-        if path == "/health":
-            status_code = "200 OK"
-            payload = {"status": "ok"}
-
-        # Route par défaut
+class H(SimpleHTTPRequestHandler):
+    """
+    Gère les requête HTTP vers le surrogate
+    """
+    def do_GET(self):
+        """
+        Envoie le contenu demandé à l'utilisateur si trouvé
+        """
+        if self.path == "/hello": # Si chemin demandé = hello, renvoie ce qui suit, du contenu fabriqué et non pas le contenu d'un fichier
+            msg = (f"Hello world from {socket.gethostname()} "
+                   f"(ip serveur {self.connection.getsockname()[0]}, "
+                   f"client {self.client_address[0]})\n").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(msg)))
+            self.end_headers()
+            self.wfile.write(msg)
+        # Teste l'ajout de fichier à refaire par la suite
+        elif self.path == "/add":
+            # Ajoute le fichier test_del.png pour tester la fonction add et delete de cache.py
+            with open(os.path.join(DOSSIER, "test_del.png"), "rb") as f:
+                contenu = f.read()
+            cache.add("test_del.jpg", 250 * 1024 * 1024, "tagtest", contenu)   # taille truquée : 100 Mo
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ajoute\n")
         else:
-            status_code = "200 OK"
-            payload = {
-                "message": "Serveur de test acti",
-                "client": {"ip": client_ip, "port": client_port},
-                "path": path,
-                "method": method,
-            }
+            # On récupère le contenu => [1:] pour enlever le premier slash
+            contenu = cache.get(self.path[1:])
+            if contenu is None:
+                self.send_error(404)
+            else:
+                # Trouve le type tout seul
+                type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
 
-        body = json.dumps(payload, indent=2).encode("utf-8")
-        headers = [
-            f"HTTP/1.1 {status_code}",
-            "Content-Type: application/json; charset=utf-8",
-            f"Content-Length: {len(body)}",
-            "Connection: close",
-            "",
-            "",
-        ]
-
-        writer.write("\r\n".join(headers).encode("utf-8") + body)
-        await writer.drain()
-
-    except Exception as e:
-        print(f"Erreur lors du traitement : {e}")
-    finally:
-        writer.close()
-        await writer.wait_closed()
+                # Renvoie le contenu au user
+                self.send_response(200)
+                self.send_header("Content-Type", type_mime)
+                self.send_header("Content-Length", str(len(contenu)))
+                self.end_headers()
+                self.wfile.write(contenu)
 
 
-async def main():
-    # 0.0.0.0 est obligatoire pour écouter en dehors du conteneur
-    server = await asyncio.start_server(handle_client, "0.0.0.0", PORT)
-    addr = server.sockets[0].getsockname()
-    print(f"Serveur asynchrone démarré sur http://{addr[0]}:{addr[1]}")
+    def send_error(self, code, message=None, explain=None):
+        """
+        Envoie une image d'erreur
+        """
+        if code == 404:
+            try:
+                with open("404PasImage.png", "rb") as f:  # relatif à www grâce au os.chdir
+                    data = f.read()
+            except OSError:
+                return super().send_error(code, message, explain)  # image absente : 404 classique
+            self.send_response(404)  # on garde bien le code 404
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(data)
+        else:
+            super().send_error(code, message, explain)
 
-    async with server:
-        await server.serve_forever()
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nArrêt du serveur.")
+HTTPServer(("0.0.0.0", 80), H).serve_forever()
