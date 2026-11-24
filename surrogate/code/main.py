@@ -11,11 +11,17 @@ import os, socket, hashlib
 import mimetypes
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from cache import Cache
-from urllib.parse import unquote
+from urllib.parse import unquote, quote # Gére rles caractères spéciaux au format URL
+import urllib.request # Pour faire une requête HTTP (surrogate devient un client de l'origin)
+import urllib.error # Pour catch les error, origin éteint, 404..
 
 TYPE = os.environ.get("TYPE", "surrogate")
 PORT = int(os.environ.get("PORT", 80))
 FILES_DIR = os.environ.get("FILES_DIR", "/files")
+
+# Adresse de l'origin, pour que le surrogate sache à qui demander les fichiers qu'il n'a pas
+# En local sur le PC, phase de test, localhost:8000. Dans containerlab : http://20.40.1.2 ? Todo, check
+ORIGIN_URL = os.environ.get("ORIGIN_URL", "http://localhost:8000")
 
 # L'origin n'a pas de cache, il sert directement son dossier de fichiers
 cache = Cache() if TYPE == "surrogate" else None
@@ -26,8 +32,22 @@ class H(SimpleHTTPRequestHandler):
     """
     Gère les requête HTTP vers le surrogate
     """
+    def fetch_from_origin(self, nom):
+        """
+        Demande le fichier à l'origin
+        Renvoie (contenu, tag) si l'origin l'a, ou (None, None) sinon
+        """
+        try:
+            # Comme un navigateur, un GET vers l'origin
+            with urllib.request.urlopen(f"{ORIGIN_URL}/{quote(nom)}", timeout=10) as rep:
+                contenu = rep.read() # Le fichier
+                tag = rep.headers.get("ETag", "").strip('"') # Son ETag sans les guillemets
+        except (urllib.error.URLError, OSError):
+            # 404 (l'origin n'a pas le fichier) ou origin éteint/injoignable : dans les deux cas on abandonne
+            return None, None
+        return contenu, tag
 
-    def servir_origin(self):
+    def serve_origin(self):
         """
         Comportement de l'origin : sert un fichier de FILES_DIR avec son ETag (sha256), ou 404 simple
         """
@@ -56,7 +76,7 @@ class H(SimpleHTTPRequestHandler):
         Envoie le contenu demandé à l'utilisateur si trouvé
         """
         if TYPE == "origin" and self.path != "/hello": # Garder /hello dispo sur l'origin pour check qu'il tourne. Le surrogate passe à côté de ce if
-            return self.servir_origin() # Le reste va à servir_origin, la route /add de test n'existe plus côté origin
+            return self.serve_origin() # Le reste va à serve_origin, la route /add de test n'existe plus côté origin
     
         if self.path == "/hello": # Si chemin demandé = hello, renvoie ce qui suit, du contenu fabriqué et non pas le contenu d'un fichier
             msg = (f"Hello world from {socket.gethostname()} "
@@ -77,20 +97,32 @@ class H(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"ajoute\n")
         else:
-            # On récupère le contenu => [1:] pour enlever le premier slash
-            contenu = cache.get(self.path[1:])
-            if contenu is None:
-                self.send_error(404)
-            else:
-                # Trouve le type tout seul
-                type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
+            # Nom du fichier, sans le "/" initial, sans les ?options et décodé
+            nom = unquote(self.path.split("?")[0]).lstrip("/")
 
-                # Renvoie le contenu au user
-                self.send_response(200)
-                self.send_header("Content-Type", type_mime)
-                self.send_header("Content-Length", str(len(contenu)))
-                self.end_headers()
-                self.wfile.write(contenu)
+            # On ne gère que des fichiers à plat, pas de sous-dossiers pour l'instant, todo après
+            if nom == "" or "/" in nom:
+                return self.send_error(404)
+
+            etat = "HIT" # On suppose qu'on l'a déjà
+            contenu = cache.get(nom)
+
+            if contenu is None: # Si on ne l'a pas --> MISS
+                etat = "MISS"
+                contenu, tag = self.fetch_from_origin(nom)
+                if contenu is None: # L'origin non plus, ou il est éteint -> 404
+                    return self.send_error(404)
+                # Rangé dans le cache pour la prochaine fois
+                cache.add(nom, len(contenu), tag, contenu)
+
+            # On renvoie le contenu au client, avec un header qui dit HIT ou MISS
+            type_mime = mimetypes.guess_type(nom)[0] or "application/octet-stream" # Trouve le type tout seul
+            self.send_response(200)
+            self.send_header("Content-Type", type_mime)
+            self.send_header("Content-Length", str(len(contenu)))
+            self.send_header("X-Cache", etat)
+            self.end_headers()
+            self.wfile.write(contenu) # Renvoie le contenu au user
 
 
     def send_error(self, code, message=None, explain=None):
