@@ -5,3 +5,9 @@ clab*/
 # Draw.io temporary backups
 *.drawio.bkp
 .*.drawio.bkp
+
+# Images test
+.*.png
+.*.jpg
+.*jpeg
+.*gif
