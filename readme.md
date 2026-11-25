@@ -113,6 +113,12 @@ Remove-Item -Recurse C:\cache
 mkdir C:\cache\data
 Set-Content C:\cache\index.json "{}"
 
+Ou plutôt :
+Remove-Item -Recurse C:\cache
+mkdir C:\cache
+Copy-Item -Recurse ..\cache\s1\* C:\cache\
+
+
 1. Terminal 1, l'origin :
 $env:TYPE = "origin"
 $env:PORT = "8000"
