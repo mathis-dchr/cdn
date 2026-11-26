@@ -1,0 +1,50 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "scriptButtonAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "u1-jp",
+      "position": {
+        "x": 280,
+        "y": 460
+      }
+    },
+    {
+      "id": "br-cdn",
+      "position": {
+        "x": 420,
+        "y": 300
+      }
+    },
+    {
+      "id": "s1",
+      "position": {
+        "x": 440,
+        "y": 460
+      }
+    },
+    {
+      "id": "s2",
+      "position": {
+        "x": 540,
+        "y": 180
+      }
+    },
+    {
+      "id": "s3",
+      "position": {
+        "x": 580,
+        "y": 340
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {
+    "nodeStyle": "boxed"
+  }
+}

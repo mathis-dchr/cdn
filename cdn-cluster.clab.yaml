@@ -1,0 +1,59 @@
+name: cdn-cluster
+
+topology:
+  nodes:
+    u1-jp:
+      kind: linux
+      image: alpine:latest
+      ports:
+        - 1003:8888
+      exec:
+        - ip addr add 29.40.2.1/24 dev eth1
+        - >-
+          sh -c 'apk add --no-cache tinyproxy &&
+          printf "Port 8888\nListen 0.0.0.0\nAllow 0.0.0.0/0\nTimeout 600\nLogLevel Info\n"
+          > /etc/tinyproxy/tinyproxy.conf &&
+          tinyproxy -c /etc/tinyproxy/tinyproxy.conf'
+
+    br-cdn:
+      kind: bridge        # le nom doit être identique à celui du bridge sur l'hôte
+
+    s1:
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code:/code:ro
+        - ./surrogate/cache/__clabNodeName__:/cache
+      env:
+        TYPE: surrogate
+      exec:
+        - ip addr add 29.40.2.2/24 dev eth1   # côté u1-jp
+        - ip addr add 30.40.2.1/24 dev eth2   # côté bridge
+
+    s2:
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code:/code:ro
+        - ./surrogate/cache/__clabNodeName__:/cache
+      env:
+        TYPE: surrogate
+      exec:
+        - ip addr add 30.40.2.2/24 dev eth1
+
+    s3:
+      kind: linux
+      image: ghcr.io/mathis-dchr/cdn:latest
+      binds:
+        - ./surrogate/code:/code:ro
+        - ./surrogate/cache/__clabNodeName__:/cache
+      env:
+        TYPE: surrogate
+      exec:
+        - ip addr add 30.40.2.3/24 dev eth1
+
+  links:
+    - endpoints: ["u1-jp:eth1", "s1:eth1"]    # 29.40.2.0/24
+    - endpoints: ["s1:eth2", "br-cdn:eth1"]   # 30.40.2.0/24
+    - endpoints: ["s2:eth1", "br-cdn:eth2"]
+    - endpoints: ["s3:eth1", "br-cdn:eth3"]
