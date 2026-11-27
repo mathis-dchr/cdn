@@ -5,3 +5,6 @@ clab*/
 # Draw.io temporary backups
 *.drawio.bkp
 .*.drawio.bkp
+
+# Cache
+*/cache/*

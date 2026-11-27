@@ -11,6 +11,7 @@ import os, socket
 import mimetypes
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from cache import Cache
+import cluster
 
 cache = Cache()
 
@@ -42,11 +43,45 @@ class H(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"ajoute\n")
+        elif self.path.startswith("/cluster"):
+            contenu = cache.get(self.path[9:])
+            if contenu is None:
+                self.send_error(404)
+            else: # Est-ce que le fait de demander un contenu dans le cluster ça fait remonter dans le cluster le LRU ?
+                # Trouve le type tout seul
+                type_mime = mimetypes.guess_type(self.path[9:])[0] or "application/octet-stream"
+
+                # Renvoie le contenu au user
+                self.send_response(200)
+                self.send_header("Content-Type", type_mime)
+                self.send_header("Content-Length", str(len(contenu)))
+                self.end_headers()
+                self.wfile.write(contenu)
         else:
             # On récupère le contenu => [1:] pour enlever le premier slash
             contenu = cache.get(self.path[1:])
             if contenu is None:
-                self.send_error(404)
+                # On va chercher dans le cluster
+                all_surrogate = cluster.lister_surrogate()
+                i = 0
+                while contenu is None and i < len(all_surrogate):
+                    contenu, tag = cluster.ask_surrogate(all_surrogate[i], self.path[1:])
+                    i += 1
+                # En théorie, on va chercher dans l'origin, pour cet exemple on renvoie une erreur
+                if contenu is None:
+                    self.send_error(404)
+                else:
+                    taille = len(contenu)
+                    cache.add(self.path[1:], taille, tag, contenu)
+                    # Trouve le type tout seul
+                    type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
+    
+                    # Renvoie le contenu au user
+                    self.send_response(200)
+                    self.send_header("Content-Type", type_mime)
+                    self.send_header("Content-Length", str(len(contenu)))
+                    self.end_headers()
+                    self.wfile.write(contenu)
             else:
                 # Trouve le type tout seul
                 type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
@@ -57,6 +92,7 @@ class H(SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(len(contenu)))
                 self.end_headers()
                 self.wfile.write(contenu)
+
 
 
     def send_error(self, code, message=None, explain=None):

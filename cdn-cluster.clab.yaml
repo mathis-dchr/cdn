@@ -27,8 +27,9 @@ topology:
       env:
         TYPE: surrogate
       exec:
-        - ip addr add 29.40.2.2/24 dev eth1   # côté u1-jp
-        - ip addr add 30.40.2.1/24 dev eth2   # côté bridge
+        - ip addr add 29.40.2.2/24 dev eth2   # côté u1-jp
+        - ip addr add 30.40.2.1/24 dev eth1   # côté bridge
+        - sh -c 'apt-get update && apt-get install -y arp-scan'
 
     s2:
       kind: linux
@@ -40,6 +41,7 @@ topology:
         TYPE: surrogate
       exec:
         - ip addr add 30.40.2.2/24 dev eth1
+        - sh -c 'apt-get update && apt-get install -y arp-scan'
 
     s3:
       kind: linux
@@ -51,9 +53,10 @@ topology:
         TYPE: surrogate
       exec:
         - ip addr add 30.40.2.3/24 dev eth1
+        - sh -c 'apt-get update && apt-get install -y arp-scan'
 
   links:
-    - endpoints: ["u1-jp:eth1", "s1:eth1"]    # 29.40.2.0/24
-    - endpoints: ["s1:eth2", "br-cdn:eth1"]   # 30.40.2.0/24
+    - endpoints: ["u1-jp:eth1", "s1:eth2"]    # 29.40.2.0/24
+    - endpoints: ["s1:eth1", "br-cdn:eth1"]   # 30.40.2.0/24
     - endpoints: ["s2:eth1", "br-cdn:eth2"]
     - endpoints: ["s3:eth1", "br-cdn:eth3"]
