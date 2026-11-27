@@ -1,11 +1,6 @@
 '''
-Lancer le script avec python mickey.py
--> Sur autre terminal, tester avec curl http://localhost/hello ou http://localhost/nom_du_fichier.html --> 200 ok
--> Tester avec curl http://localhost/nom_du_fichier_inexistant.html ou http://localhost/autretexte --> 404 not found
-
-Curl avec Hello renvoie le nom de la machine et l'ip du serveur et du client
-Curl avec un fichier existant renvoie le contenu du fichier
-
+TODO:
+- Faire documentation
 '''
 import os, socket
 import mimetypes
@@ -13,87 +8,76 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from cache import Cache
 import cluster
 
-cache = Cache()
-
+TYPE = os.environ.get("TYPE", "surrogate")
+PORT = int(os.environ.get("PORT", 80))
 DOSSIER = os.path.dirname(os.path.abspath(__file__))
+
+# L'origin n'a pas de cache, il sert directement son dossier de fichiers
+cache = Cache() if TYPE == "surrogate" else None
 
 class H(SimpleHTTPRequestHandler):
     """
     Gère les requête HTTP vers le surrogate
     """
+    def _send_content(self, type_mime, content):
+        """
+        Renvoie le contenu à l'utilisateur
+        """
+        self.send_response(200)
+        self.send_header("Content-Type", type_mime)
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
     def do_GET(self):
         """
         Envoie le contenu demandé à l'utilisateur si trouvé
         """
-        if self.path == "/hello": # Si chemin demandé = hello, renvoie ce qui suit, du contenu fabriqué et non pas le contenu d'un fichier
-            msg = (f"Hello world from {socket.gethostname()} "
-                   f"(ip serveur {self.connection.getsockname()[0]}, "
-                   f"client {self.client_address[0]})\n").encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain")
-            self.send_header("Content-Length", str(len(msg)))
-            self.end_headers()
-            self.wfile.write(msg)
-        # Teste l'ajout de fichier à refaire par la suite
-        elif self.path == "/add":
-            # Ajoute le fichier test_del.png pour tester la fonction add et delete de cache.py
-            with open(os.path.join(DOSSIER, "test_del.png"), "rb") as f:
-                contenu = f.read()
-            cache.add("test_del.jpg", 250 * 1024 * 1024, "tagtest", contenu)   # taille truquée : 100 Mo
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"ajoute\n")
-        elif self.path.startswith("/cluster"):
-            contenu = cache.get(self.path[9:])
-            if contenu is None:
+        
+        # Requete de la part d'un surrogate
+        if self.path.startswith("/cluster"):
+            # On essaye de récupérer le contenu sur le cache
+            contenu = cache.get(self.path[9:]) # [9:] on enlève '/cluster/' du chemin
+            if contenu is None: # Contenu non trouvé sur le cluster
                 self.send_error(404)
-            else: # Est-ce que le fait de demander un contenu dans le cluster ça fait remonter dans le cluster le LRU ?
+            else:
                 # Trouve le type tout seul
                 type_mime = mimetypes.guess_type(self.path[9:])[0] or "application/octet-stream"
 
                 # Renvoie le contenu au user
-                self.send_response(200)
-                self.send_header("Content-Type", type_mime)
-                self.send_header("Content-Length", str(len(contenu)))
-                self.end_headers()
-                self.wfile.write(contenu)
+                self._send_content(type_mime, contenu)
+
+        # Requete de la part d'un user
         else:
-            # On récupère le contenu => [1:] pour enlever le premier slash
-            contenu = cache.get(self.path[1:])
+            content_name = self.path[1:] # [1:] pour enlever le premier slash
+            # On récupère le contenu
+            contenu = cache.get(content_name)
+
+            # Si non présent dans le cache, on cherche dans le cluster
             if contenu is None:
-                # On va chercher dans le cluster
                 all_surrogate = cluster.lister_surrogate()
                 i = 0
                 while contenu is None and i < len(all_surrogate):
-                    contenu, tag = cluster.ask_surrogate(all_surrogate[i], self.path[1:])
+                    contenu, tag = cluster.ask_surrogate(all_surrogate[i], content_name)
                     i += 1
                 # En théorie, on va chercher dans l'origin, pour cet exemple on renvoie une erreur
                 if contenu is None:
                     self.send_error(404)
-                else:
+                else: # Contenu trouvé dans le cluster
                     taille = len(contenu)
-                    cache.add(self.path[1:], taille, tag, contenu)
+                    # On rajoute le contenu dans le cache
+                    cache.add(content_name, taille, tag, contenu)
                     # Trouve le type tout seul
-                    type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
+                    type_mime = mimetypes.guess_type(content_name)[0] or "application/octet-stream"
     
                     # Renvoie le contenu au user
-                    self.send_response(200)
-                    self.send_header("Content-Type", type_mime)
-                    self.send_header("Content-Length", str(len(contenu)))
-                    self.end_headers()
-                    self.wfile.write(contenu)
-            else:
+                    self._send_content(type_mime, contenu)
+            else: # Contenu présent dans le cache
                 # Trouve le type tout seul
                 type_mime = mimetypes.guess_type(self.path[1:])[0] or "application/octet-stream"
 
                 # Renvoie le contenu au user
-                self.send_response(200)
-                self.send_header("Content-Type", type_mime)
-                self.send_header("Content-Length", str(len(contenu)))
-                self.end_headers()
-                self.wfile.write(contenu)
-
-
+                self._send_content(type_mime, contenu)
 
     def send_error(self, code, message=None, explain=None):
         """
